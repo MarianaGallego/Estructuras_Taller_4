@@ -23,9 +23,12 @@ public class MainUI extends JFrame {
     private GridFile gridFile;
     private MetricsTracker metrics;
 
+    private JTextField xField, yField;
+    private JTextField xMinField, xMaxField, yMinField, yMaxField;
+
     public MainUI() {
         super("Explorador Espacial");
-        setSize(800, 700);
+        setSize(900, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
@@ -46,8 +49,11 @@ public class MainUI extends JFrame {
         estructuraSelector = new JComboBox<>(new String[]{"KD-Tree", "QuadTree", "Grid File"});
         estructuraSelector.addActionListener(e -> switchPanel());
 
-        JButton insertarBtn = new JButton("Insertar puntos aleatorios");
+        JButton insertarBtn = new JButton("Insertar aleatorios");
         insertarBtn.addActionListener(e -> insertarPuntos());
+
+        JButton consultaPuntualBtn = new JButton("Consulta puntual");
+        consultaPuntualBtn.addActionListener(e -> consultaPuntual());
 
         JButton consultaRangoBtn = new JButton("Consulta por rango");
         consultaRangoBtn.addActionListener(e -> consultaRango());
@@ -55,18 +61,39 @@ public class MainUI extends JFrame {
         JButton vecinoBtn = new JButton("Vecino más cercano");
         vecinoBtn.addActionListener(e -> vecinoMasCercano());
 
-        JPanel topPanel = new JPanel();
-        topPanel.add(new JLabel("Estructura:"));
-        topPanel.add(estructuraSelector);
-        topPanel.add(insertarBtn);
-        topPanel.add(consultaRangoBtn);
-        topPanel.add(vecinoBtn);
+        xField = new JTextField(3);
+        yField = new JTextField(3);
+        xMinField = new JTextField(3);
+        xMaxField = new JTextField(3);
+        yMinField = new JTextField(3);
+        yMaxField = new JTextField(3);
 
-        metricasArea = new JTextArea(6, 60);
+        JPanel inputPanel = new JPanel();
+        inputPanel.add(new JLabel("Estructura:"));
+        inputPanel.add(estructuraSelector);
+        inputPanel.add(insertarBtn);
+        inputPanel.add(new JLabel("x:"));
+        inputPanel.add(xField);
+        inputPanel.add(new JLabel("y:"));
+        inputPanel.add(yField);
+        inputPanel.add(consultaPuntualBtn);
+        inputPanel.add(vecinoBtn);
+
+        inputPanel.add(new JLabel("xMin:"));
+        inputPanel.add(xMinField);
+        inputPanel.add(new JLabel("xMax:"));
+        inputPanel.add(xMaxField);
+        inputPanel.add(new JLabel("yMin:"));
+        inputPanel.add(yMinField);
+        inputPanel.add(new JLabel("yMax:"));
+        inputPanel.add(yMaxField);
+        inputPanel.add(consultaRangoBtn);
+
+        metricasArea = new JTextArea(6, 70);
         metricasArea.setEditable(false);
         JScrollPane scroll = new JScrollPane(metricasArea);
 
-        add(topPanel, BorderLayout.NORTH);
+        add(inputPanel, BorderLayout.NORTH);
         add(canvasPanel, BorderLayout.CENTER);
         add(scroll, BorderLayout.SOUTH);
 
@@ -101,45 +128,81 @@ public class MainUI extends JFrame {
         mostrarMetricas("Inserción");
     }
 
-    private void consultaRango() {
-        int xMin = 20, xMax = 70, yMin = 20, yMax = 70;
-        List<int[]> encontrados;
+    private void consultaPuntual() {
+        try {
+            int x = Integer.parseInt(xField.getText());
+            int y = Integer.parseInt(yField.getText());
+            boolean existe;
 
-        metrics.resetDiskAccesses();
-        metrics.startTimer();
-        if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
-            encontrados = kdTree.rangeSearch(xMin, xMax, yMin, yMax);
-        } else if (estructuraSelector.getSelectedItem().equals("QuadTree")) {
-            encontrados = quadTree.rangeQuery(xMin, xMax, yMin, yMax);
-        } else {
-            encontrados = gridFile.rangeQuery(xMin, xMax, yMin, yMax);
+            metrics.resetDiskAccesses();
+            metrics.startTimer();
+            if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
+                existe = kdTree.search(new int[]{x, y});
+            } else if (estructuraSelector.getSelectedItem().equals("QuadTree")) {
+                existe = quadTree.containsPoint(new int[]{x, y});
+            } else {
+                existe = gridFile.containsPoint(new int[]{x, y});
+            }
+            metrics.endTimer();
+            repaint();
+            mostrarMetricas("Consulta puntual", existe ? 1 : 0);
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Ingrese coordenadas x e y válidas");
         }
-        metrics.endTimer();
-        repaint();
-        mostrarMetricas("Consulta por rango", encontrados.size());
+    }
+
+    private void consultaRango() {
+        try {
+            int xMin = Integer.parseInt(xMinField.getText());
+            int xMax = Integer.parseInt(xMaxField.getText());
+            int yMin = Integer.parseInt(yMinField.getText());
+            int yMax = Integer.parseInt(yMaxField.getText());
+            List<int[]> encontrados;
+
+            metrics.resetDiskAccesses();
+            metrics.startTimer();
+            if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
+                encontrados = kdTree.rangeSearch(xMin, xMax, yMin, yMax);
+            } else if (estructuraSelector.getSelectedItem().equals("QuadTree")) {
+                encontrados = quadTree.rangeQuery(xMin, xMax, yMin, yMax);
+            } else {
+                encontrados = gridFile.rangeQuery(xMin, xMax, yMin, yMax);
+            }
+            metrics.endTimer();
+            repaint();
+            mostrarMetricas("Consulta por rango", encontrados.size());
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Ingrese todos los valores de rango como números enteros válidos.");
+        }
     }
 
     private void vecinoMasCercano() {
-        int[] target = {50, 50};
-        int[] vecino;
+        try {
+            int x = Integer.parseInt(xField.getText());
+            int y = Integer.parseInt(yField.getText());
+            int[] target = {x, y};
+            int[] vecino;
 
-        metrics.resetDiskAccesses();
-        metrics.startTimer();
-        /*if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
-            vecino = kdTree.nearestNeighbor(target);
-        } else if (estructuraSelector.getSelectedItem().equals("QuadTree")) {
-            vecino = quadTree.nearestNeighbor(target);
-        } else {
-            vecino = gridFile.nearestNeighbor(target);
-        }*/
-        if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
-            vecino = kdTree.nearestNeighbor(target);
-        } else {
-            vecino = gridFile.nearestNeighbor(target);
+            metrics.resetDiskAccesses();
+            metrics.startTimer();
+            /*if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
+                vecino = kdTree.nearestNeighbor(target);
+            } else if (estructuraSelector.getSelectedItem().equals("QuadTree")) {
+                vecino = quadTree.nearestNeighbor(target);
+            } else {
+                vecino = gridFile.nearestNeighbor(target);
+            }*/
+            if (estructuraSelector.getSelectedItem().equals("KD-Tree")) {
+                vecino = kdTree.nearestNeighbor(target);
+            } else {
+                vecino = gridFile.nearestNeighbor(target);
+            }
+            metrics.endTimer();
+            repaint();
+            mostrarMetricas("Vecino más cercano", 1, vecino);
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Ingrese coordenadas x e y válidas para vecino.");
         }
-        metrics.endTimer();
-        repaint();
-        mostrarMetricas("Vecino más cercano", 1, vecino);
     }
 
     private void mostrarMetricas(String operacion) {
@@ -166,4 +229,3 @@ public class MainUI extends JFrame {
         SwingUtilities.invokeLater(MainUI::new);
     }
 }
-
